@@ -1,0 +1,274 @@
+@page "/tickets"
+@rendermode InteractiveServer
+
+@using SoporteLab.Web.Services
+@inject TicketApiService TicketService
+
+<PageTitle>Tickets</PageTitle>
+
+<h1>Mesa de Ayuda TI</h1>
+
+<h4>Nuevo Ticket</h4>
+
+<div class="row g-2 mb-4">
+    <div class="col-md-4">
+        <input class="form-control" placeholder="Título" @bind="nuevoTicket.Titulo" />
+    </div>
+
+    <div class="col-md-4">
+        <input class="form-control" placeholder="Solicitante" @bind="nuevoTicket.Solicitante" />
+    </div>
+
+    <div class="col-md-4">
+        <input class="form-control" placeholder="Categoría" @bind="nuevoTicket.Categoria" />
+    </div>
+
+    <div class="col-md-4">
+        <select class="form-select" @bind="nuevoTicket.Prioridad">
+            <option>Baja</option>
+            <option>Media</option>
+            <option>Alta</option>
+            <option>Crítica</option>
+        </select>
+    </div>
+
+    <div class="col-md-4">
+        <select class="form-select" @bind="nuevoTicket.Estado">
+            <option>Abierto</option>
+            <option>En proceso</option>
+            <option>Resuelto</option>
+            <option>Cerrado</option>
+        </select>
+    </div>
+
+    <div class="col-md-12">
+        <textarea class="form-control" placeholder="Descripción" @bind="nuevoTicket.Descripcion"></textarea>
+    </div>
+
+    <div class="col-md-12">
+        <button class="btn btn-primary" @onclick="GuardarTicket">
+            @(nuevoTicket.Id == 0 ? "Guardar Ticket" : "Actualizar Ticket")
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(mensajeError))
+{
+    <div class="alert alert-danger">
+        @mensajeError
+    </div>
+}
+
+<div class="mb-3 d-flex gap-2 flex-wrap">
+    <input class="form-control"
+           style="max-width: 400px"
+           placeholder="Buscar por título, categoría, estado, prioridad o solicitante..."
+           @bind="textoBusqueda"
+           @bind:event="oninput" />
+
+    <select class="form-select" style="max-width: 200px" @bind="estadoSeleccionado">
+        <option value="">Todos los estados</option>
+        <option value="Abierto">Abierto</option>
+        <option value="En proceso">En proceso</option>
+        <option value="Resuelto">Resuelto</option>
+        <option value="Cerrado">Cerrado</option>
+    </select>
+
+    <select class="form-select" style="max-width: 200px" @bind="prioridadSeleccionada">
+        <option value="">Todas las prioridades</option>
+        <option value="Baja">Baja</option>
+        <option value="Media">Media</option>
+        <option value="Alta">Alta</option>
+        <option value="Crítica">Crítica</option>
+    </select>
+</div>
+
+@if (tickets == null && string.IsNullOrWhiteSpace(mensajeError))
+{
+    <p>Cargando tickets...</p>
+}
+else if (tickets != null && !TicketsFiltrados.Any())
+{
+    <p>No hay tickets que coincidan con la búsqueda.</p>
+}
+else if (tickets != null)
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Título</th>
+                <th>Categoría</th>
+                <th>Solicitante</th>
+                <th>Estado</th>
+                <th>Prioridad</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var ticket in TicketsFiltrados)
+            {
+                <tr>
+                    <td>@ticket.Titulo</td>
+                    <td>@ticket.Categoria</td>
+                    <td>@ticket.Solicitante</td>
+
+                    <td>
+                        @if (ticket.Estado == "Abierto")
+                        {
+                            <span class="badge bg-success">Abierto</span>
+                        }
+                        else if (ticket.Estado == "En proceso")
+                        {
+                            <span class="badge bg-warning text-dark">En proceso</span>
+                        }
+                        else if (ticket.Estado == "Resuelto")
+                        {
+                            <span class="badge bg-info text-dark">Resuelto</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">@ticket.Estado</span>
+                        }
+                    </td>
+
+                    <td>
+                        @if (ticket.Prioridad == "Crítica")
+                        {
+                            <span class="badge bg-danger">Crítica</span>
+                        }
+                        else if (ticket.Prioridad == "Alta")
+                        {
+                            <span class="badge bg-warning text-dark">Alta</span>
+                        }
+                        else if (ticket.Prioridad == "Media")
+                        {
+                            <span class="badge bg-primary">Media</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">@ticket.Prioridad</span>
+                        }
+                    </td>
+
+                    <td>
+                        <button class="btn btn-sm btn-warning me-1" @onclick="() => CargarParaEditar(ticket)">
+                            Editar
+                        </button>
+
+                        <button class="btn btn-sm btn-danger" @onclick="() => EliminarTicket(ticket.Id)">
+                            Eliminar
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    List<TicketDto>? tickets;
+    string textoBusqueda = "";
+    string estadoSeleccionado = "";
+    string prioridadSeleccionada = "";
+    string mensajeError = "";
+
+    TicketDto nuevoTicket = new()
+    {
+        Prioridad = "Media",
+        Estado = "Abierto"
+    };
+
+    IEnumerable<TicketDto> TicketsFiltrados =>
+        (tickets ?? []).Where(t =>
+            (string.IsNullOrWhiteSpace(textoBusqueda) ||
+                t.Titulo.Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                t.Categoria.Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                t.Estado.Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                t.Prioridad.Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                t.Solicitante.Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase))
+            &&
+            (string.IsNullOrWhiteSpace(estadoSeleccionado) ||
+                t.Estado == estadoSeleccionado)
+            &&
+            (string.IsNullOrWhiteSpace(prioridadSeleccionada) ||
+                t.Prioridad == prioridadSeleccionada)
+        );
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarTickets();
+    }
+
+    async Task CargarTickets()
+    {
+        try
+        {
+            mensajeError = "";
+            tickets = await TicketService.ObtenerTicketsAsync();
+        }
+        catch
+        {
+            tickets = new();
+            mensajeError = "No fue posible conectarse con la API. Verifique que SoporteLab.Api esté ejecutándose.";
+        }
+    }
+
+    async Task GuardarTicket()
+    {
+        try
+        {
+            mensajeError = "";
+
+            if (nuevoTicket.Id == 0)
+            {
+                await TicketService.CrearTicketAsync(nuevoTicket);
+            }
+            else
+            {
+                await TicketService.ActualizarTicketAsync(nuevoTicket);
+            }
+
+            await CargarTickets();
+
+            nuevoTicket = new TicketDto
+            {
+                Prioridad = "Media",
+                Estado = "Abierto"
+            };
+        }
+        catch
+        {
+            mensajeError = "No fue posible guardar el ticket. Verifique la conexión con la API.";
+        }
+    }
+
+    void CargarParaEditar(TicketDto ticket)
+    {
+        nuevoTicket = new TicketDto
+        {
+            Id = ticket.Id,
+            Titulo = ticket.Titulo,
+            Descripcion = ticket.Descripcion,
+            Categoria = ticket.Categoria,
+            Prioridad = ticket.Prioridad,
+            Estado = ticket.Estado,
+            Solicitante = ticket.Solicitante,
+            FechaRegistro = ticket.FechaRegistro
+        };
+    }
+
+    async Task EliminarTicket(int id)
+    {
+        try
+        {
+            mensajeError = "";
+            await TicketService.EliminarTicketAsync(id);
+            await CargarTickets();
+        }
+        catch
+        {
+            mensajeError = "No fue posible eliminar el ticket. Verifique la conexión con la API.";
+        }
+    }
+}

@@ -1,0 +1,21 @@
+@base = http://localhost:5136/api/tickets
+
+### Listar tickets
+GET {{base}}
+Accept: application/json
+
+### Consultar ticket por id
+GET {{base}}/1
+Accept: application/json
+
+### Crear ticket
+POST {{base}}
+Content-Type: application/json
+
+{
+  "titulo": "No enciende computadora",
+  "descripcion": "La computadora del laboratorio 2 no enciende.",
+  "categoria": "Hardware",
+  "prioridad": "Alta",
+  "solicitante": "Melissa"
+}
